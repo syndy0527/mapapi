@@ -1,0 +1,8 @@
+form{
+    display: flex;
+    justify-content: center;
+    margin: auto;
+}
+.weather-report{
+    text-align: center;
+}

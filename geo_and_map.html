@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="css/style.css">
+  <title>位置情報取得&map表示</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      height: calc(100% - 102px);
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 id="h1">天気予報&Map表示</h1>
+  <p><input type="text" id="from" value="防府"> <button id="get">検索</button></p>
+  <form action="">
+    <fieldset class="weather-report">
+      <legend>今日の天気</legend>
+      <p class="date"></p>
+      <img src="" alt="" class="icon">
+      <p class="weather"></p>
+    </fieldset>
+    <fieldset>
+      <legend>週間天気</legend>
+    </fieldset>
+  </form>
+  <!-- <p id="lat">緯度</p> -->
+  <!-- <p id="lng">経度</p> -->
+  <div id="map"></div>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src='https://www.bing.com/api/maps/mapcontrol?callback=GetMap&key=' async defer></script>
+  <script src="http://api.openweathermap.org/data/2.5/forecast?id=524901&appid="></script>
+  <!-- axiosライブラリの読み込み -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+  <script>
+    // 日時をいい感じの形式にする関数
+    function convertTimestampToDatetime(timestamp) {
+      const _d = timestamp ? new Date(timestamp * 1000) : new Date();
+      const Y = _d.getFullYear();
+      const m = (_d.getMonth() + 1).toString().padStart(2, '0');
+      const d = _d.getDate().toString().padStart(2, '0');
+      const H = _d.getHours().toString().padStart(2, '0');
+      const i = _d.getMinutes().toString().padStart(2, '0');
+      const s = _d.getSeconds().toString().padStart(2, '0');
+      return `${m}/${d}`;
+    }
+  </script>
+  <script>
+    let map; //mapobject用
+    let searchManager;//serchobject用
+    function GetMap() {
+      //map生成
+      map = new Microsoft.Maps.Map("#map", {
+        zoom: 15,
+        mapTypeId: Microsoft.Maps.MapTypeId.aerial
+      });
+      //検索モジュール指定
+      Microsoft.Maps.loadModule('Microsoft.Maps.Search', function () {
+        //searchManagerインスタンス化（Geocode,ReverseGeocodeが使用可能になる）
+        searchManager = new Microsoft.Maps.Search.SearchManager(map);
+        //Geocode：住所から検索
+        geocodeQuery(document.getElementById("from").value);
+      });
+    }
+    /**
+     * 検索ボタン[Click:Event]
+     */
+    document.getElementById("get").onclick = function () {
+      //4.Geocode:住所から検索
+      geocodeQuery(document.getElementById("from").value);
+    };
+
+    /**
+     * 住所から緯度経度を取得
+     * @param query [住所文字列]
+     */
+    function geocodeQuery(query) {
+      if (searchManager) {
+        //住所から緯度経度を検索
+        searchManager.geocode({
+          where: query,       //検索文字列
+          callback: function (r) { //検索結果を"( r )" の変数で取得
+            //最初の検索取得結果をMAPに表示
+            if (r && r.results && r.results.length > 0) {
+              //Pushpinを立てる
+              const pin = new Microsoft.Maps.Pushpin(r.results[0].location);
+              map.entities.push(pin);
+              //map表示位置を再設定
+              map.setView({ bounds: r.results[0].bestView });
+              //取得た緯度経度をh1要素にJSON文字列にして表示
+              console.log(r.results[0].location);
+              const lat = r.results[0].location.latitude
+              const lng = r.results[0].location.longitude
+              // document.getElementById("lat").innerText = JSON.stringify(lat)
+              // document.getElementById("lng").innerText = JSON.stringify(lng)
+              //今日の天気の取得リクエスト
+              const url = "http://api.openweathermap.org/data/2.5/weather?lat=" + lat + "&lon=" + lng + "&appid=";
+              console.log(url);
+              //今日天気情報取得
+              axios
+                .get(url)
+                .then(function (response) {
+                  console.log(response);
+                  let weather = response.data.weather[0].main
+                  let icon = response.data.weather[0].icon
+                  let date = response.data.coord.dt
+                  console.log(weather);
+                  console.log(icon);
+                  $(".icon").attr("src", "http://openweathermap.org/img/w/" + icon + ".png");
+                  $(".weather").text(weather);
+                  $(".date").text(convertTimestampToDatetime(date));
+
+                })
+                .catch(function (error) {
+                  console.log(error);
+                })
+                .finally(function () {
+                  console.log("done!");
+                })
+              //週間天気の取得リクエスト
+              const urlweek = "http://api.openweathermap.org/data/2.5/forecast?lat=" + lat + "&lon=" + lng + "&appid=";
+              //週間天気情報取得
+              axios
+                .get(urlweek)
+                .then(function (response) {
+                  console.log(response);
+                  const array = [];
+                  console.log(array);
+                  for (let i = 0; i < response.data.list.length; i++) {
+                    let weekweather = response.data.list[i].weather[0].main;
+                    let weekicon = response.data.list[i].weather[0].icon;
+                    let weekgate = convertTimestampToDatetime(response.data.list[i].dt)
+                    array.push({ weekweather, weekicon, weekgate });
+
+                    //   $("#output").html(array);
+                  }
+                  // let weather = response.data.weather[0].main
+                  // let icon = response.data.weather[0].icon
+                  // console.log(weather);
+                  // console.log(icon);
+                  // $(".icon").attr("src", "http://openweathermap.org/img/w/" + icon + ".png");
+                  // $(".weather").text(weather);
+                  // $(".date").text(convertTimestampToDatetime());
+
+                })
+                .catch(function (error) {
+                  console.log(error);
+                })
+                .finally(function () {
+                  console.log("done!");
+                })
+            }
+          },
+          errorCallback: function (e) {
+            alert("見つかりません");
+          }
+        });
+      }
+    }
+  </script>
+
+</body>
+
+</html>
